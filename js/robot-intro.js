@@ -52,8 +52,8 @@
       var visible = r.bottom > 12 && r.top < vh - 12 && r.right > 0 && r.left < vw;
       var p = { el: el, kind: kind, r: r, animate: visible };
       if (kind === 'card' && visible) { nCards += 1; if (nCards > maxCards) { p.animate = false; p.fade = true; } }
-      // Punto de agarre: centro de la parte visible de la pieza.
-      p.grip = {
+      // Centro de la parte visible (sólo para ordenar y repartir el trabajo).
+      p.center = {
         x: (Math.max(r.left, 0) + Math.min(r.right, vw)) / 2,
         y: (Math.max(r.top, 0) + Math.min(r.bottom, vh)) / 2
       };
@@ -63,39 +63,64 @@
   }
 
   // ---------- planificación ----------
+  // Celda de ensamblaje: robots en los cuatro bordes. Cada pieza sale de un
+  // alimentador fuera de pantalla y entra en línea recta hasta su lugar.
   function makeRobots(vw, vh, mobile) {
     var R = [];
-    function rb(id, x, y, nx, ny, elbow, delay) {
-      R.push({ id: id, st: { x: x, y: y }, n: { x: nx, y: ny }, t: { x: -ny, y: nx }, elbow: elbow, delay: delay, jobs: [] });
+    function rb(id, x, y, nx, ny, elbow) {
+      R.push({ id: id, st: { x: x, y: y }, n: { x: nx, y: ny }, t: { x: -ny, y: nx }, elbow: elbow, jobs: [] });
     }
+    rb('top', vw * 0.55, -14, 0, 1, 1);
+    rb('left', -14, vh * 0.45, 1, 0, -1);
+    rb('right', vw + 14, vh * 0.35, -1, 0, 1);
     if (mobile) {
-      rb('top', vw * 0.78, -10, 0, 1, 1, 0);
-      rb('right', vw + 10, vh * 0.40, -1, 0, 1, 120);
-      rb('bottom', vw * 0.30, vh + 10, 0, -1, -1, 240);
+      rb('bottom', vw * 0.5, vh + 10, 0, -1, -1);
     } else {
-      rb('top', vw * 0.62, -14, 0, 1, 1, 0);
-      rb('left', -14, vh * 0.55, 1, 0, -1, 90);
-      rb('right', vw + 14, vh * 0.55, -1, 0, 1, 180);
-      rb('bottom', vw * 0.74, vh + 14, 0, -1, 1, 270);
+      rb('bottomL', vw * 0.40, vh + 14, 0, -1, -1);
+      rb('bottomR', vw * 0.72, vh + 14, 0, -1, 1);
     }
     return R;
   }
   function byId(R, id) { for (var i = 0; i < R.length; i += 1) { if (R[i].id === id) { return R[i]; } } return null; }
 
-  // Punto de recogida: fuera del borde, detrás de la base (como un alimentador).
-  function pickPoint(robot, p) {
-    var halfIn = robot.n.x !== 0 ? p.r.width / 2 : p.r.height / 2;
-    var back = Math.min(halfIn * 0.75 + 20, 190);
-    var toward = (p.grip.x - robot.st.x) * robot.t.x + (p.grip.y - robot.st.y) * robot.t.y;
-    return add(add(robot.st, robot.n, -back), robot.t, clamp(toward * 0.25, -120, 120));
+  // Punto de agarre: cerca del borde de la pieza que mira al robot (como lo
+  // tomaría una pinza real), centrado en el otro eje y dentro de la pantalla.
+  function gripFor(rb, p, vw, vh) {
+    var r = p.r, g = { x: p.center.x, y: p.center.y };
+    var size = rb.n.x !== 0 ? r.width : r.height;
+    var inset = clamp(size * 0.22, 22, 80);
+    if (rb.n.x > 0) { g.x = Math.max(r.left, 0) + inset; }          // robot a la izquierda
+    else if (rb.n.x < 0) { g.x = Math.min(r.right, vw) - inset; }   // robot a la derecha
+    else if (rb.n.y > 0) { g.y = Math.max(r.top, 0) + inset; }      // robot arriba
+    else { g.y = Math.min(r.bottom, vh) - inset; }                  // robot abajo
+    return g;
+  }
+
+  // Cuánto se extiende la pieza más allá del agarre, hacia el interior de la pantalla.
+  function farExtent(rb, p) {
+    var r = p.r, c = [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]], m = 0;
+    c.forEach(function (q) { m = Math.max(m, (q[0] - p.grip.x) * rb.n.x + (q[1] - p.grip.y) * rb.n.y); });
+    return m;
+  }
+
+  // Alimentador: fuera del borde, en la misma línea que el agarre, para que la pieza
+  // entre derecho. Lo bastante atrás para que quede oculta mientras espera.
+  function pickPoint(rb, p) {
+    p.ext = farExtent(rb, p);
+    // Piezas muy largas (la barra superior) esperan asomando apenas: el robot las
+    // trae tomadas del extremo, como quien desliza una regla sobre la mesa.
+    p.back = p.ext + 30 <= 360 ? Math.max(p.ext + 30, 60) : 60;
+    var edgeN = rb.st.x * rb.n.x + rb.st.y * rb.n.y;          // posición del borde sobre n
+    var gripN = p.grip.x * rb.n.x + p.grip.y * rb.n.y;
+    return add(p.grip, rb.n, (edgeN - p.back) - gripN);
   }
 
   function plan(vw, vh, mobile, pieces) {
     // Tiempos (ms) de cada fase. STAGGER separa el inicio de cada traslado para que
     // los brazos entren uno tras otro en vez de todos a la vez.
     var T = mobile
-      ? { enter: 700, app: 420, grip: 170, carry: 850, rel: 170, ret: 380, exit: 520, stagger: 650 }
-      : { enter: 700, app: 420, grip: 160, carry: 850, rel: 160, ret: 380, exit: 500, stagger: 480 };
+      ? { enter: 700, app: 520, grip: 170, carry: 900, rel: 170, ret: 380, exit: 520, stagger: 650 }
+      : { enter: 700, app: 520, grip: 160, carry: 900, rel: 160, ret: 380, exit: 500, stagger: 480 };
     var R = makeRobots(vw, vh, mobile);
     var lastStart = -Infinity;
     function nextStart(rb) {
@@ -106,40 +131,49 @@
       var start = nextStart(rb);
       lastStart = start;
       p.robot = rb; p.carry0 = start; p.carry1 = start + T.carry;
-      p.pick = pickPoint(rb, p);
-      p.rot0 = (rb.elbow > 0 ? 1 : -1) * (3 + Math.random() * 4) * Math.PI / 180;
+      p.grip = gripFor(rb, p, vw, vh);
       rb.jobs.push(p); rb.avail = p.carry1 + T.rel;
     }
     var anim = pieces.filter(function (p) { return p.animate; });
+    // La barra superior entra deslizándose desde la derecha (no la deja caer el robot
+    // de arriba, que la tendría pegada a su base); la barra lateral, desde la izquierda.
     anim.forEach(function (p) {
-      if (p.kind === 'header') { assign(byId(R, 'top'), p); }
-      else if (p.kind === 'sidebar') { assign(byId(R, mobile ? 'right' : 'left'), p); }
+      if (p.kind === 'header') { assign(byId(R, 'right'), p); }
+      else if (p.kind === 'sidebar') { assign(byId(R, 'left'), p); }
     });
+    // Tarjetas: desde el borde más cercano, repartiendo para que no espere un solo robot.
     anim.filter(function (p) { return p.kind === 'card'; })
       .sort(function (a, b) { return (a.r.top - b.r.top) || (a.r.left - b.r.left); })
       .forEach(function (p) {
         var best = null, bestCost = Infinity;
         R.forEach(function (rb) {
-          var c = nextStart(rb) + dist(rb.st, p.grip) * 0.55;
+          var edge = rb.n.x > 0 ? { x: 0, y: p.center.y } : rb.n.x < 0 ? { x: vw, y: p.center.y } : { x: p.center.x, y: vh };
+          var c = nextStart(rb) + dist(edge, p.center) * 1.2;
           if (c < bestCost) { bestCost = c; best = rb; }
         });
         assign(best, p);
       });
-
-    // Si hay muchas piezas, comprimir un poco para no pasar de ~6 s en total.
-    var end = 0;
-    R.forEach(function (rb) { if (rb.jobs.length) { end = Math.max(end, rb.avail + T.ret + T.exit); } });
-    var k = end > 6000 ? 6000 / end : 1;
 
     var used = R.filter(function (rb) { return rb.jobs.length > 0; });
     // Mover cada base a lo largo de su borde hacia el centro de sus trabajos.
     used.forEach(function (rb) {
       var horiz = rb.n.x === 0, edge = horiz ? vw : vh, sum = 0;
       rb.jobs.forEach(function (p) { sum += horiz ? p.grip.x : p.grip.y; });
-      var m = clamp(sum / rb.jobs.length, edge * 0.12, edge * 0.88);
+      var m = clamp(sum / rb.jobs.length, edge * 0.1, edge * 0.9);
       if (horiz) { rb.st.x = m; } else { rb.st.y = m; }
-      rb.jobs.forEach(function (p) { p.pick = pickPoint(rb, p); });
+      rb.jobs.forEach(function (p) {
+        p.pick = pickPoint(rb, p);
+        // Leve inclinación al tomarla; en piezas largas, casi nada (gira desde el extremo).
+        var maxRot = Math.min(4 * Math.PI / 180, 14 / Math.max(p.ext, 1));
+        p.rot0 = (rb.elbow > 0 ? 1 : -1) * maxRot * (0.5 + Math.random() * 0.5);
+      });
     });
+
+    // Si hay muchas piezas, comprimir un poco para no pasar de ~6 s en total.
+    var end = 0;
+    R.forEach(function (rb) { if (rb.jobs.length) { end = Math.max(end, rb.avail + T.ret + T.exit); } });
+    var k = end > 6000 ? 6000 / end : 1;
+
     used.forEach(function (rb) {
       // Largo de eslabones: lo justo para alcanzar todo, con margen.
       var maxD = 0;
@@ -148,12 +182,15 @@
       rb.L1 = L * 1.06; rb.L2 = L * 0.94;
       rb.w = clamp(L * 0.075, mobile ? 9 : 12, mobile ? 15 : 22); // "calibre" del robot
       rb.rest = add(rb.st, rb.n, L * 0.55);
-      rb.off = (rb.L1 + rb.L2) + 260;
+      var first = rb.jobs[0];
+      rb.off = Math.max((rb.L1 + rb.L2) + 260, first.ext - first.back + 80);
       var segs = [], prev = null;
       rb.jobs.forEach(function (p, i) {
         if (i === 0) {
           // Cada brazo entra justo antes de su primer traslado (no todos al comienzo).
-          segs.push({ type: 'enter', t0: Math.max(0, p.carry0 - T.enter), t1: p.carry0, p: p });
+          // La duración de la entrada crece con la distancia, para no "teletransportar" piezas largas.
+          var enterDur = clamp(rb.off / 1.5, T.enter, 1500);
+          segs.push({ type: 'enter', t0: p.carry0 - enterDur, t1: p.carry0, p: p });
         } else {
           segs.push({ type: 'app', t0: prev.carry1 + T.rel, t1: p.carry0 - T.grip, from: prev.grip, p: p });
           segs.push({ type: 'grip', t0: p.carry0 - T.grip, t1: p.carry0, p: p });
@@ -169,6 +206,16 @@
       rb.segs = segs;
       rb.end = segs[segs.length - 1].t1;
     });
+    // Si alguna entrada quedó antes de t=0, correr toda la línea de tiempo.
+    var minT = 0;
+    used.forEach(function (rb) { minT = Math.min(minT, rb.segs[0].t0); });
+    if (minT < 0) {
+      used.forEach(function (rb) {
+        rb.segs.forEach(function (s) { s.t0 -= minT; s.t1 -= minT; });
+        rb.jobs.forEach(function (p) { p.carry0 -= minT; p.carry1 -= minT; });
+        rb.end -= minT;
+      });
+    }
     var total = 0;
     used.forEach(function (rb) { total = Math.max(total, rb.end); });
     return { robots: used, total: total };
