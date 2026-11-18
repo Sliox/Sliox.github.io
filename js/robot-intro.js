@@ -121,6 +121,7 @@
     var T = mobile
       ? { enter: 700, app: 520, grip: 170, carry: 900, rel: 170, ret: 380, exit: 520, stagger: 650 }
       : { enter: 700, app: 520, grip: 160, carry: 900, rel: 160, ret: 380, exit: 500, stagger: 480 };
+    T.pull = mobile ? 1000 : 1150;   // tirón de la "cortina" (barra superior)
     var R = makeRobots(vw, vh, mobile);
     var lastStart = -Infinity;
     function nextStart(rb) {
@@ -129,17 +130,30 @@
     }
     function assign(rb, p) {
       var start = nextStart(rb);
+      // La cortina necesita que el brazo llegue y cierre la pinza antes de tirar.
+      if (p.curtain && !rb.jobs.length) { start = Math.max(start, T.enter + T.grip); }
       lastStart = start;
-      p.robot = rb; p.carry0 = start; p.carry1 = start + T.carry;
-      p.grip = gripFor(rb, p, vw, vh);
+      p.robot = rb; p.carry0 = start; p.carry1 = start + (p.curtain ? T.pull : T.carry);
+      if (p.curtain) {
+        // Se toma del borde inferior (el "dobladillo") que asoma arriba de la pantalla.
+        p.grip = { x: clamp(vw * 0.5, 40, vw - 40), y: p.r.bottom - 6 };
+      } else {
+        p.grip = gripFor(rb, p, vw, vh);
+      }
       rb.jobs.push(p); rb.avail = p.carry1 + T.rel;
     }
     var anim = pieces.filter(function (p) { return p.animate; });
-    // La barra superior entra deslizándose desde la derecha (no la deja caer el robot
-    // de arriba, que la tendría pegada a su base); la barra lateral, desde la izquierda.
+    // La barra superior es una cortina: está enrollada arriba, asomando sólo su borde
+    // inferior; un brazo que sube desde abajo la toma de ese borde y la tira hacia abajo.
+    // La barra lateral entra desde la izquierda.
+    var bottoms = R.filter(function (rb) { return rb.n.y < 0; });
     anim.forEach(function (p) {
-      if (p.kind === 'header') { assign(byId(R, 'right'), p); }
-      else if (p.kind === 'sidebar') { assign(byId(R, 'left'), p); }
+      if (p.kind === 'header') {
+        p.curtain = true;
+        var best = bottoms[0];
+        bottoms.forEach(function (rb) { if (Math.abs(rb.st.x - vw / 2) < Math.abs(best.st.x - vw / 2)) { best = rb; } });
+        assign(best, p);
+      } else if (p.kind === 'sidebar') { assign(byId(R, 'left'), p); }
     });
     // Tarjetas: desde el borde más cercano, repartiendo para que no espere un solo robot.
     anim.filter(function (p) { return p.kind === 'card'; })
@@ -162,6 +176,12 @@
       var m = clamp(sum / rb.jobs.length, edge * 0.1, edge * 0.9);
       if (horiz) { rb.st.x = m; } else { rb.st.y = m; }
       rb.jobs.forEach(function (p) {
+        if (p.curtain) {
+          // Posición "enrollada": la barra subida, asomando 8 px por el borde superior.
+          p.pick = { x: p.grip.x, y: p.grip.y - (p.r.height - 8) };
+          p.ext = 0; p.back = 0; p.rot0 = 0;
+          return;
+        }
         p.pick = pickPoint(rb, p);
         // Leve inclinación al tomarla; en piezas largas, casi nada (gira desde el extremo).
         var maxRot = Math.min(4 * Math.PI / 180, 14 / Math.max(p.ext, 1));
@@ -190,7 +210,13 @@
           // Cada brazo entra justo antes de su primer traslado (no todos al comienzo).
           // La duración de la entrada crece con la distancia, para no "teletransportar" piezas largas.
           var enterDur = clamp(rb.off / 1.5, T.enter, 1500);
-          segs.push({ type: 'enter', t0: p.carry0 - enterDur, t1: p.carry0, p: p });
+          if (p.curtain) {
+            // Llega con la pinza abierta, la cierra sobre el borde y recién ahí tira.
+            segs.push({ type: 'enter', t0: p.carry0 - T.grip - enterDur, t1: p.carry0 - T.grip, p: p });
+            segs.push({ type: 'grip', t0: p.carry0 - T.grip, t1: p.carry0, p: p });
+          } else {
+            segs.push({ type: 'enter', t0: p.carry0 - enterDur, t1: p.carry0, p: p });
+          }
         } else {
           segs.push({ type: 'app', t0: prev.carry1 + T.rel, t1: p.carry0 - T.grip, from: prev.grip, p: p });
           segs.push({ type: 'grip', t0: p.carry0 - T.grip, t1: p.carry0, p: p });
@@ -233,11 +259,16 @@
         var e = easeOut(u);
         var delta = { x: -rb.n.x * rb.off * (1 - e), y: -rb.n.y * rb.off * (1 - e) };
         base = add(rb.st, delta); tcp = add(s.p.pick, delta);
-        open = 0; held = s.p; rot = s.p.rot0; lift = 1; z = 1;
+        if (s.p.curtain) { open = 1; z = 0.6; }                 // sube vacía a buscar la cortina
+        else { open = 0; held = s.p; rot = s.p.rot0; lift = 1; z = 1; }
         break;
       case 'app': tcp = lerpP(s.from, s.p.pick, ease(u)); z = Math.sin(Math.PI * u) * 0.6; break;
-      case 'grip': tcp = s.p.pick; open = 1 - ease(u); held = u > 0.5 ? s.p : null; rot = s.p.rot0; lift = u; z = u; break;
+      case 'grip': tcp = s.p.pick; open = 1 - ease(u); held = u > 0.5 ? s.p : null; rot = s.p.rot0; lift = s.p.curtain ? 0 : u; z = u; break;
       case 'carry':
+        if (s.p.curtain) {                                       // tirón recto hacia abajo
+          tcp = lerpP(s.p.pick, s.p.grip, ease(u)); open = 0; held = s.p; z = 0.3;
+          break;
+        }
         var c = ease(u), a = s.p.pick, b = s.p.grip;
         var d = dist(a, b) || 1;
         var perp = { x: -(b.y - a.y) / d, y: (b.x - a.x) / d };
@@ -474,6 +505,12 @@
     if (!p.held) { p.held = true; p.el.classList.add('ri-held'); }
   }
 
+  // Cortina enrollada: la barra subida, asomando sólo el borde inferior.
+  function peekCurtain(p) {
+    p.el.style.transform = 'translate(0,' + (p.pick.y - p.grip.y).toFixed(1) + 'px)';
+    if (!p.el.classList.contains('ri-held')) { p.el.classList.add('ri-held'); }
+  }
+
   function clearPiece(p) {
     p.el.style.transform = ''; p.el.style.transformOrigin = '';
     p.el.classList.remove('ri-held');
@@ -559,7 +596,10 @@
       if (running !== st) { return; }
       var t = now - st.t0;
       ctx.clearRect(0, 0, vw, vh);
-      st.pieces.forEach(function (p) { if (p.animate && p.carry1 !== undefined && t >= p.carry1) { placePiece(p, now, st); } });
+      st.pieces.forEach(function (p) {
+        if (p.animate && p.carry1 !== undefined && t >= p.carry1) { placePiece(p, now, st); }
+        else if (p.curtain && !p.held && !p.placed) { peekCurtain(p); }
+      });
       st.marks = st.marks.filter(function (m) { return drawMarks(ctx, m, now); });
       st.robots.forEach(function (rb) {
         var P = pose(rb, t);
