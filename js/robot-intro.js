@@ -203,13 +203,17 @@
       rb.w = clamp(L * 0.075, mobile ? 9 : 12, mobile ? 15 : 22); // "calibre" del robot
       rb.rest = add(rb.st, rb.n, L * 0.55);
       var first = rb.jobs[0];
-      rb.off = Math.max((rb.L1 + rb.L2) + 260, first.ext - first.back + 80);
+      // Distancia de entrada/salida: lo justo para quedar fuera de pantalla. El brazo de
+      // la cortina entra vacío, así que no necesita el margen extra.
+      rb.off = first.curtain ? (rb.L1 + rb.L2) + 60
+                             : Math.max((rb.L1 + rb.L2) + 260, first.ext - first.back + 80);
       var segs = [], prev = null;
       rb.jobs.forEach(function (p, i) {
         if (i === 0) {
           // Cada brazo entra justo antes de su primer traslado (no todos al comienzo).
           // La duración de la entrada crece con la distancia, para no "teletransportar" piezas largas.
-          var enterDur = clamp(rb.off / 1.2, T.enter, 1600);
+          // La cortina abre la animación: su brazo entra en el mismo tiempo que los demás.
+          var enterDur = p.curtain ? T.enter : clamp(rb.off / 1.2, T.enter, 1600);
           if (p.curtain) {
             // Llega con la pinza abierta, la cierra sobre el borde y recién ahí tira.
             segs.push({ type: 'enter', t0: p.carry0 - T.grip - enterDur, t1: p.carry0 - T.grip, p: p });
@@ -218,7 +222,11 @@
             segs.push({ type: 'enter', t0: p.carry0 - enterDur, t1: p.carry0, p: p });
           }
         } else {
-          segs.push({ type: 'app', t0: prev.carry1 + T.rel, t1: p.carry0 - T.grip, from: prev.grip, p: p });
+          // Si le toca esperar su turno, espera quieto y después se acerca a ritmo normal
+          // (antes el acercamiento se estiraba y se veía en cámara lenta).
+          var appStart = Math.max(prev.carry1 + T.rel, p.carry0 - T.grip - T.app);
+          if (appStart > prev.carry1 + T.rel) { segs.push({ type: 'wait', t0: prev.carry1 + T.rel, t1: appStart, at: prev.grip }); }
+          segs.push({ type: 'app', t0: appStart, t1: p.carry0 - T.grip, from: prev.grip, p: p });
           segs.push({ type: 'grip', t0: p.carry0 - T.grip, t1: p.carry0, p: p });
         }
         segs.push({ type: 'carry', t0: p.carry0, t1: p.carry1, p: p });
@@ -265,6 +273,7 @@
         if (s.p.curtain) { open = 1; z = 0.6; }                 // sube vacía a buscar la cortina
         else { open = 0; held = s.p; rot = s.p.rot0; lift = 1; z = 1; }
         break;
+      case 'wait': tcp = s.at; break;
       case 'app': tcp = lerpP(s.from, s.p.pick, ease(u)); z = Math.sin(Math.PI * u) * 0.6; break;
       case 'grip': tcp = s.p.pick; open = 1 - ease(u); held = u > 0.5 ? s.p : null; rot = s.p.rot0; lift = s.p.curtain ? 0 : u; z = u; break;
       case 'carry':
