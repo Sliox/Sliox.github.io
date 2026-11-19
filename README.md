@@ -7,7 +7,7 @@ index.html            Sobre mí + proyectos destacados (con la animación de los
 portafolio.html       Todos los proyectos
 cv.html               Currículum
 proyectos/            Una página por proyecto
-css/style.css         Estilos (réplica del tema anterior, claro y oscuro)
+css/style.css         Estilos (tema "mint" de la plantilla; oscuro por defecto)
 js/main.js            Tema, menú en móvil, botón "Contacto", año del pie
 js/robot-intro.js     Animación de los brazos robóticos
 img/                  Avatar, favicon e imágenes de proyectos

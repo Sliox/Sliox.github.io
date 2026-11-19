@@ -8,15 +8,15 @@
   <meta property="og:title" content="CV · Nicolás Barrionuevo">
   <meta property="og:description" content="Currículum de Nicolás Barrionuevo, estudiante de Técnico en Mecatrónica en INACAP Copiapó.">
   <meta property="og:locale" content="es_CL">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#1a2421">
   <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/style.css">
   <script>
-    // Tema guardado (o el del sistema) antes del primer pintado.
+    // Tema guardado antes del primer pintado; por defecto, mint oscuro.
     (function () {
       var t = null;
       try { t = localStorage.getItem('theme'); } catch (e) {}
-      if (!t) { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+      if (!t) { t = 'dark'; }
       document.documentElement.setAttribute('data-theme', t);
     })();
   </script>
