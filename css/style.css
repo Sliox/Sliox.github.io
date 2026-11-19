@@ -227,7 +227,11 @@ html.ri-pending [data-ri-piece] { visibility: hidden; }
 html.ri-pending [data-ri-piece], html.ri-pending [data-ri-piece] * { transition: none !important; }
 html.ri-pending .ri-held,
 html.ri-pending .ri-placed { visibility: visible; }
-html.ri-running, html.ri-running body { overflow-x: clip; }
+/* Durante la intro no se puede hacer scroll (en vez de cortar la animación).
+   scrollbar-gutter reserva el espacio de la barra para que nada salte al bloquearla. */
+html { scrollbar-gutter: stable; }
+html.ri-running { overflow: hidden; }
+html.ri-running body { overflow-x: clip; touch-action: none; }
 
 .ri-held { will-change: transform; background-color: var(--global-bg-color); box-shadow: 0 26px 40px -14px rgba(0, 0, 0, .5); transition: none !important; }
 .project-card.ri-held { position: relative; z-index: 60; }

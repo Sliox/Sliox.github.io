@@ -121,7 +121,7 @@
     var T = mobile
       ? { enter: 700, app: 520, grip: 170, carry: 900, rel: 170, ret: 380, exit: 520, stagger: 650 }
       : { enter: 700, app: 520, grip: 160, carry: 900, rel: 160, ret: 380, exit: 500, stagger: 480 };
-    T.pull = mobile ? 1000 : 1150;   // tirón de la "cortina" (barra superior)
+    T.pull = T.carry;                 // el tirón de la cortina dura lo mismo que cualquier traslado
     var R = makeRobots(vw, vh, mobile);
     var lastStart = -Infinity;
     function nextStart(rb) {
@@ -209,7 +209,7 @@
         if (i === 0) {
           // Cada brazo entra justo antes de su primer traslado (no todos al comienzo).
           // La duración de la entrada crece con la distancia, para no "teletransportar" piezas largas.
-          var enterDur = clamp(rb.off / 1.5, T.enter, 1500);
+          var enterDur = clamp(rb.off / 1.2, T.enter, 1600);
           if (p.curtain) {
             // Llega con la pinza abierta, la cierra sobre el borde y recién ahí tira.
             segs.push({ type: 'enter', t0: p.carry0 - T.grip - enterDur, t1: p.carry0 - T.grip, p: p });
@@ -226,7 +226,10 @@
         prev = p;
       });
       segs.push({ type: 'ret', t0: rb.avail, t1: rb.avail + T.ret, from: prev.grip });
-      segs.push({ type: 'exit', t0: rb.avail + T.ret, t1: rb.avail + T.ret + T.exit });
+      // La salida dura según cuánto tiene que recorrer el brazo: los brazos largos
+      // (los que hacen varias tareas) ya no se van "disparados" de la pantalla.
+      var exitDur = clamp(rb.off / 1.2, T.exit, 1600);
+      segs.push({ type: 'exit', t0: rb.avail + T.ret, t1: rb.avail + T.ret + exitDur });
       segs.forEach(function (s) { s.t0 *= k; s.t1 *= k; });
       rb.jobs.forEach(function (p) { p.carry0 *= k; p.carry1 *= k; });
       rb.segs = segs;
@@ -278,7 +281,7 @@
       case 'rel': tcp = s.p.grip; open = ease(u); break;
       case 'ret': tcp = lerpP(s.from, rb.rest, ease(u)); z = Math.sin(Math.PI * u) * 0.5; break;
       case 'exit':
-        var x = easeIn(u);
+        var x = u * u;                                           // acelera suave, sin latigazo
         var dl = { x: -rb.n.x * rb.off * x, y: -rb.n.y * rb.off * x };
         base = add(rb.st, dl); tcp = add(rb.rest, dl);
         break;
@@ -530,11 +533,14 @@
     running = null;
     cancelAnimationFrame(st.raf);
     st.pieces.forEach(function (p) { clearPiece(p); p.el.classList.remove('ri-placed', 'ri-fade'); });
-    if (st.canvas.parentNode) { st.canvas.parentNode.removeChild(st.canvas); }
+    // Fundido corto del lienzo en vez de borrarlo de golpe.
+    var cv = st.canvas;
+    cv.style.transition = 'opacity .35s ease';
+    cv.style.opacity = '0';
+    setTimeout(function () { if (cv.parentNode) { cv.parentNode.removeChild(cv); } }, 380);
     if (st.skip.parentNode) { st.skip.parentNode.removeChild(st.skip); }
     window.removeEventListener('keydown', st.onKey);
     window.removeEventListener('resize', st.onResize);
-    window.removeEventListener('scroll', st.onScroll);
     html.classList.remove('ri-pending', 'ri-running');
     markSeen();
   }
@@ -576,7 +582,6 @@
       pieces: pieces, robots: pl.robots, total: pl.total, canvas: canvas, ctx: ctx, skip: skip,
       vw: vw, vh: vh, marks: [], t0: performance.now(), raf: 0,
       onKey: function (e) { if (e.key === 'Escape') { finish(); } },
-      onScroll: function () { if (window.scrollY > 40) { finish(); } },
       // En móviles la barra de direcciones cambia el alto al hacer scroll: sólo cortar si cambia el ancho.
       onResize: function () { if (window.innerWidth !== vw) { finish(); } }
     };
@@ -590,7 +595,6 @@
 
     window.addEventListener('keydown', st.onKey);
     window.addEventListener('resize', st.onResize);
-    window.addEventListener('scroll', st.onScroll, { passive: true });
 
     function frame(now) {
       if (running !== st) { return; }
