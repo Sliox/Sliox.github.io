@@ -122,6 +122,7 @@
       ? { enter: 700, app: 520, grip: 170, carry: 900, rel: 170, ret: 380, exit: 520, stagger: 650 }
       : { enter: 700, app: 520, grip: 160, carry: 900, rel: 160, ret: 380, exit: 500, stagger: 480 };
     T.pull = T.carry * 0.8;           // el primer brazo (la cortina) va un poco más rápido
+    T.app = T.carry;                  // ir a buscar la siguiente pieza, al mismo ritmo con que se coloca
     var R = makeRobots(vw, vh, mobile);
     var lastStart = -Infinity;
     function nextStart(rb) {
