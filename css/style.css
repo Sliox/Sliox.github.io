@@ -18,7 +18,7 @@
   --global-text-color: #40514e;
   --global-text-color-light: #5c6d6a;
   --global-footer-text-color: #40514e;
-  --accent: #f28c28;            /* naranja de los robots y del titular */
+  --accent: #f28c28;            /* naranja de los robots */
   --font: -apple-system, ".SFNSText-Regular", "San Francisco", "Roboto", "Segoe UI", "Helvetica Neue", "Lucida Grande", Arial, sans-serif;
 }
 /* Mint oscuro */
@@ -144,7 +144,6 @@ html[data-theme="dark"] .icon-sun, html:not([data-theme="dark"]) .icon-moon { di
 /* Sin avatar (como en Minimal Mistakes cuando no se define uno): el perfil empieza con el nombre */
 .author__content:first-child { padding-left: 0; }
 .author__name { margin: 0; font-size: 1em; }
-.author__headline { margin: .1em 0 .5em; font-size: .8em !important; font-weight: 600; color: var(--accent); }
 .author__bio { margin: 0; }
 .author__urls-wrapper { position: relative; align-self: center; z-index: 10; }
 .author__urls-wrapper .btn { margin-bottom: 0; }
