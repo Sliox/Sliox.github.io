@@ -2,7 +2,7 @@
 import { getCollection } from "astro:content";
 import BaseDetail from "../../layouts/BaseDetail.astro";
 import { PAGES } from "../../config";
-import FugasAire from "../../components/demos/FugasAire.astro";
+import CorreaVision from "../../components/demos/CorreaVision.astro";
 
 if (PAGES.projects.isActive === false) {
     return Astro.redirect(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/404`);
@@ -23,5 +23,5 @@ const demo = project?.data?.demo;
 ---
 
 <BaseDetail collection="projects" id={id}>
-    {demo === "fugas-aire" && <FugasAire slot="demo" />}
+    {demo === "correa-3d" && <CorreaVision slot="demo" />}
 </BaseDetail>

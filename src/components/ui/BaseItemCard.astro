@@ -1,6 +1,7 @@
 ---
 import Tag from "./Tag.astro";
 import Icon from "./Icon.astro";
+import { withBase } from "../../utils/url";
 
 interface Props {
     title: string;
@@ -11,12 +12,18 @@ interface Props {
     extraInput?: string;
     tags?: string[];
     externalUrl?: string;
+    image?: string;
 }
 
-const { title, href, description, date, authors, extraInput, tags, externalUrl } = Astro.props;
+const { title, href, description, date, authors, extraInput, tags, externalUrl, image } = Astro.props;
 ---
 
-<article class="card" data-ri-piece="card">
+<article class={`card${image ? " card--media" : ""}`} data-ri-piece="card">
+    {image && (
+        <a href={href} class="card-thumb" tabindex="-1" aria-hidden="true">
+            <img src={withBase(image)} alt="" loading="lazy" width="640" height="360" />
+        </a>
+    )}
     <div class="card-content">
         <a href={href} class="card-title">{title}</a>
 

@@ -1061,3 +1061,43 @@ html.ri-running body {
     color: #111;
     outline: none;
 }
+
+
+/* ===========================================
+   TARJETAS CON IMAGEN (proyectos con "image" en el frontmatter)
+   =========================================== */
+
+.card--media {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.card-thumb {
+    display: block;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    aspect-ratio: 16 / 9;
+    text-decoration: none;
+}
+
+.card-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.card--media:hover .card-thumb img {
+    transform: scale(1.04);
+}
+
+@media (max-width: 640px) {
+    .card--media {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+}

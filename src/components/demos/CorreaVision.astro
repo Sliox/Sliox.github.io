@@ -1,0 +1,673 @@
+---
+// Demo 3D del proyecto "Visión para desvío de correa".
+// - Escena 3D (Three.js): correa transportadora con polines, poleas, tolva y mineral.
+// - Modelo de deriva lateral de la correa (simplificado, de primer orden).
+// - Visión artificial: una cámara virtual renderiza la vista superior y los bordes
+//   de la correa se detectan analizando los píxeles de esa imagen.
+// - Control PI opcional sobre un polín autoalineante, usando la medición de la cámara.
+---
+
+<section class="cv-demo" aria-labelledby="cv-titulo">
+    <h2 id="cv-titulo" class="section-title">Simulación 3D</h2>
+    <p class="cv-help">
+        Arrastra para girar la vista (rueda o pellizco para acercar). Desalinea un polín o descentra la carga y mira
+        cómo se desvía la correa: la cámara de visión la mide en cada momento.
+    </p>
+
+    <div class="cv-stage" data-cv="stage">
+        <canvas class="cv-canvas" data-cv="canvas" aria-label="Simulación 3D de una correa transportadora con una cámara de visión sobre la correa"></canvas>
+        <div class="cv-badge" data-cv="badge">Normal</div>
+        <p class="cv-loading" data-cv="loading">Cargando simulación 3D…</p>
+    </div>
+
+    <div class="cv-panel">
+        <div class="cv-vision">
+            <p class="cv-title">Cámara de visión · vista superior</p>
+            <canvas class="cv-vcanvas" data-cv="vcanvas" width="480" height="120" aria-label="Imagen de la cámara de visión con los bordes detectados"></canvas>
+            <dl class="cv-read">
+                <div><dt>Desvío medido</dt><dd data-cv="meas">0 mm</dd></div>
+                <div><dt>Desvío real</dt><dd data-cv="real">0 mm</dd></div>
+                <div><dt>Ancho detectado</dt><dd data-cv="width">–</dd></div>
+                <div><dt>Corrección</dt><dd data-cv="corr">0,0°</dd></div>
+            </dl>
+        </div>
+
+        <form class="cv-controls" data-cv="form" onsubmit="return false">
+            <label><span>Velocidad de la correa: <output data-out="v">3,0</output> m/s</span>
+                <input type="range" name="v" min="0" max="5" step="0.1" value="3" />
+            </label>
+            <label><span>Desalineación del polín 4: <output data-out="skew">0,0</output>°</span>
+                <input type="range" name="skew" min="-3" max="3" step="0.1" value="0" />
+            </label>
+            <label><span>Carga descentrada: <output data-out="load">0</output> %</span>
+                <input type="range" name="load" min="-30" max="30" step="1" value="0" />
+            </label>
+            <label class="cv-check">
+                <input type="checkbox" name="auto" />
+                <span>Corrección automática (polín autoalineante con control PI)</span>
+            </label>
+            <div class="cv-buttons">
+                <button type="button" class="btn btn-sm" data-cv="fault">Simular falla</button>
+                <button type="button" class="btn btn-sm" data-cv="reset">Reiniciar</button>
+            </div>
+            <p class="cv-legend">
+                Umbrales: <span class="cv-dot cv-ok"></span> normal &lt; 25 mm ·
+                <span class="cv-dot cv-warn"></span> advertencia &lt; 50 mm ·
+                <span class="cv-dot cv-bad"></span> alarma
+            </p>
+        </form>
+    </div>
+</section>
+
+<style is:global>
+    .cv-demo { margin: 1.5rem 0 2.5rem; }
+    .cv-help { margin-bottom: 1rem; }
+    .cv-stage {
+        position: relative; width: 100%; height: 440px;
+        border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden;
+        background: #1b1d20;
+    }
+    @media (max-width: 768px) { .cv-stage { height: 320px; } }
+    .cv-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    .cv-canvas:active { cursor: grabbing; }
+    .cv-badge {
+        position: absolute; top: 0.75rem; left: 0.75rem;
+        padding: 0.3rem 0.7rem; border-radius: 999px;
+        font: 700 0.8rem/1 "Inter", system-ui, sans-serif; color: #0f1614;
+        background: #30e3ca; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+    .cv-badge.is-warn { background: #f5b942; }
+    .cv-badge.is-bad { background: #ef5b5b; color: #fff; }
+    .cv-loading {
+        position: absolute; inset: 0; margin: 0; display: grid; place-items: center;
+        color: #e6dfd3; font-size: 0.9rem; opacity: 0.8;
+    }
+
+    .cv-panel { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
+    @media (max-width: 900px) { .cv-panel { grid-template-columns: 1fr; } }
+    .cv-vision, .cv-controls { border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; }
+    .cv-title { font-size: 0.8rem; font-weight: 600; opacity: 0.75; margin: 0 0 0.5rem; }
+    .cv-vcanvas { display: block; width: 100%; height: auto; border-radius: 0.25rem; image-rendering: pixelated; background: #000; }
+    .cv-read { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 0; }
+    .cv-read dt { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
+    .cv-read dd { margin: 0.1rem 0 0; font-family: "JetBrains Mono", monospace; font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+
+    .cv-controls { display: flex; flex-direction: column; gap: 0.85rem; }
+    .cv-controls label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; font-weight: 600; }
+    .cv-controls output { color: var(--accent); }
+    .cv-controls input[type="range"] { accent-color: var(--accent); }
+    .cv-controls .cv-check { flex-direction: row; align-items: flex-start; gap: 0.5rem; font-weight: 600; }
+    .cv-check input { accent-color: var(--accent); margin-top: 0.2rem; }
+    .cv-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .cv-legend { font-size: 0.75rem; opacity: 0.75; margin: 0; }
+    .cv-dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; vertical-align: -0.05rem; }
+    .cv-ok { background: #30e3ca; } .cv-warn { background: #f5b942; } .cv-bad { background: #ef5b5b; }
+</style>
+
+<script>
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+    // ======================================================================
+    // Parámetros de la planta (metros, segundos)
+    // ======================================================================
+    const L = 14;               // largo entre poleas
+    const BELT_W = 1.0;         // ancho de la correa (1000 mm)
+    const BELT_Y = 1.0;         // altura de la superficie de carga
+    const IDLER_GAP = 1.2;      // distancia entre estaciones de polines
+    const X_SKEW = -2.4;        // polín 4 (el que el usuario desalinea)
+    const X_TRAIN = 1.2;        // polín autoalineante (lo mueve el control)
+    const X_CAM = 3.6;          // posición de la cámara de visión
+    const SKEW_VISUAL = 4;      // exageración visual del giro de los polines
+
+    // Modelo de deriva lateral (primer orden, valores ilustrativos):
+    //   dy/dt = V·(KS·θ + KL·carga) − KC·y
+    // Un polín girado θ "empuja" la correa hacia un lado en proporción a la velocidad;
+    // la carga descentrada hace lo mismo; el abarquillamiento y las poleas tienden a recentrar.
+    const KS = 0.12, KL = 0.0111, KC = 0.25;
+    const Y_MAX = 0.16;         // tope físico (la correa toca la estructura)
+    const SPILL_START = 0.06;   // desde ~60 mm empieza a botar material por el borde
+
+    // Control PI del polín autoalineante (sobre el desvío medido, en mm)
+    const KP = 0.04, KI = 0.015, CORR_MAX = 3;  // °/mm, °/(mm·s), °
+
+    // Visión: render de la vista superior y umbral de luminancia (espacio lineal)
+    const VW = 480, VH = 120, V_HALF = 0.75;    // 1,5 m de ancho visible → 3,1 mm por píxel
+    const V_DEPTH = (V_HALF * VH) / VW;         // largo visible a lo largo de la correa (±)
+
+    const nf = (v: number, d = 0) => v.toLocaleString("es-CL", { minimumFractionDigits: d, maximumFractionDigits: d });
+    const smooth = (t: number) => { const c = Math.min(1, Math.max(0, t)); return c * c * (3 - 2 * c); };
+    const SHAPE_REF = smooth((X_CAM + L / 2) / L);
+    /** Forma del desvío a lo largo de la correa: 0 en la cola, 1 en la cámara. */
+    const shape = (x: number) => smooth((x + L / 2) / L) / SHAPE_REF;
+
+    let cleanup: (() => void) | null = null;
+
+    function init() {
+        const root = document.querySelector<HTMLElement>(".cv-demo");
+        if (!root || root.dataset.ready) return;
+        root.dataset.ready = "1";
+        const q = <T extends Element = HTMLElement>(k: string) => root.querySelector(`[data-cv="${k}"]`) as T;
+
+        const stage = q("stage");
+        const canvas = q<HTMLCanvasElement>("canvas");
+        const vcanvas = q<HTMLCanvasElement>("vcanvas");
+        const vctx = vcanvas.getContext("2d")!;
+        const form = q<HTMLFormElement>("form");
+
+        // ------------------------------------------------------------------
+        // Renderizador, escena y cámaras
+        // ------------------------------------------------------------------
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1b1d20);
+        scene.fog = new THREE.Fog(0x1b1d20, 22, 45);
+
+        const camera = new THREE.PerspectiveCamera(42, 2, 0.1, 100);
+        camera.position.set(-3.8, 3.4, 6.4);
+        const controls = new OrbitControls(camera, canvas);
+        controls.target.set(1.6, 0.95, 0);
+        controls.enableDamping = true;
+        controls.maxPolarAngle = Math.PI * 0.48;
+        controls.minDistance = 3;
+        controls.maxDistance = 24;
+
+        // Capa 1 = lo que ve la cámara de visión
+        const VISION = 1;
+        const hemi = new THREE.HemisphereLight(0xdfe8f0, 0x2e2a26, 1.1);
+        const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+        sun.position.set(6, 11, 6);
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(1024, 1024);
+        Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 6, bottom: -6, near: 1, far: 30 });
+        hemi.layers.enable(VISION);
+        sun.layers.enable(VISION);
+        scene.add(hemi, sun);
+
+        // ------------------------------------------------------------------
+        // Materiales
+        // ------------------------------------------------------------------
+        const steel = new THREE.MeshStandardMaterial({ color: 0x8f99a3, roughness: 0.55, metalness: 0.6 });
+        const yellow = new THREE.MeshStandardMaterial({ color: 0xd6a51c, roughness: 0.6, metalness: 0.2 });
+        const rubber = new THREE.MeshStandardMaterial({ color: 0x222325, roughness: 0.95 });
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, 30),
+            new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Textura de la correa: caucho oscuro con marcas de empalme, para que se vea el avance
+        function beltTexture() {
+            const c = document.createElement("canvas");
+            c.width = 512; c.height = 64;
+            const g = c.getContext("2d")!;
+            g.fillStyle = "#191a1c"; g.fillRect(0, 0, 512, 64);
+            for (let i = 0; i < 900; i++) {
+                g.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`;
+                g.fillRect(Math.random() * 512, Math.random() * 64, 2, 1);
+            }
+            g.fillStyle = "#212226";
+            for (let x = 0; x < 512; x += 128) g.fillRect(x, 0, 6, 64);
+            const t = new THREE.CanvasTexture(c);
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.wrapS = THREE.RepeatWrapping;
+            t.repeat.set(L / 4, 1);
+            return t;
+        }
+        const topTex = beltTexture();
+        const retTex = beltTexture();
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: topTex, roughness: 0.95 });
+        const retMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: retTex, roughness: 0.95 });
+
+        // ------------------------------------------------------------------
+        // Estructura
+        // ------------------------------------------------------------------
+        const frame = new THREE.Group();
+        for (const z of [-0.66, 0.66]) {
+            const stringer = new THREE.Mesh(new THREE.BoxGeometry(L + 0.6, 0.14, 0.07), yellow);
+            stringer.position.set(0, 0.86, z);
+            stringer.castShadow = stringer.receiveShadow = true;
+            stringer.layers.enable(VISION);
+            frame.add(stringer);
+            for (let x = -L / 2 + 0.6; x <= L / 2 - 0.5; x += 2.4) {
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.86, 0.08), yellow);
+                leg.position.set(x, 0.43, z);
+                leg.castShadow = true;
+                frame.add(leg);
+            }
+        }
+        scene.add(frame);
+
+        // Placa de fondo bajo la zona de la cámara: da contraste para la visión (práctica habitual)
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.6), new THREE.MeshBasicMaterial({ color: 0xc9cdd2 }));
+        plate.rotation.x = -Math.PI / 2;
+        plate.position.set(X_CAM, 0.62, 0);
+        plate.layers.enable(VISION);
+        scene.add(plate);
+
+        // Polines (estaciones planas) — cada uno en un grupo para poder girarlo
+        const idlerGeo = new THREE.CylinderGeometry(0.065, 0.065, 1.15, 20);
+        idlerGeo.rotateX(Math.PI / 2);
+        const idlers: { x: number; group: THREE.Group; mesh: THREE.Mesh }[] = [];
+        for (let x = -L / 2 + 1; x <= L / 2 - 1 + 1e-6; x += IDLER_GAP) {
+            const group = new THREE.Group();
+            group.position.set(x, BELT_Y - 0.075, 0);
+            const mesh = new THREE.Mesh(idlerGeo, steel);
+            mesh.castShadow = mesh.receiveShadow = true;
+            group.add(mesh);
+            for (const z of [-0.6, 0.6]) {
+                const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.04), yellow);
+                bracket.position.set(0, -0.06, z);
+                group.add(bracket);
+            }
+            scene.add(group);
+            idlers.push({ x, group, mesh });
+            // Polines de retorno
+            const ret = new THREE.Mesh(idlerGeo, steel);
+            ret.position.set(x + 0.6, 0.33, 0);
+            scene.add(ret);
+        }
+        const nearest = (x0: number) => idlers.reduce((a, b) => (Math.abs(b.x - x0) < Math.abs(a.x - x0) ? b : a));
+        const skewIdler = nearest(X_SKEW);
+        const trainIdler = nearest(X_TRAIN);
+        skewIdler.mesh.material = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.4, metalness: 0.7 });
+        trainIdler.mesh.material = new THREE.MeshStandardMaterial({ color: 0x30e3ca, roughness: 0.5, metalness: 0.3 });
+
+        // Poleas de cabeza y cola
+        const pulleyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 36);
+        pulleyGeo.rotateX(Math.PI / 2);
+        for (const x of [-L / 2, L / 2]) {
+            const p = new THREE.Mesh(pulleyGeo, rubber);
+            p.position.set(x, BELT_Y - 0.3, 0);
+            p.castShadow = true;
+            scene.add(p);
+        }
+
+        // Correa de carga (malla deformable: se desplaza lateralmente) y de retorno
+        const SEG = 140;
+        const beltGeo = new THREE.PlaneGeometry(L, BELT_W, SEG, 1);
+        beltGeo.rotateX(-Math.PI / 2);
+        const basePos = Float32Array.from(beltGeo.attributes.position.array as Float32Array);
+        const belt = new THREE.Mesh(beltGeo, beltMat);
+        belt.position.y = BELT_Y;
+        belt.castShadow = belt.receiveShadow = true;
+        belt.layers.enable(VISION);
+        scene.add(belt);
+
+        const ret = new THREE.Mesh(new THREE.PlaneGeometry(L, BELT_W), retMat);
+        ret.rotation.x = -Math.PI / 2;
+        ret.position.y = 0.41;
+        ret.receiveShadow = true;
+        scene.add(ret);
+
+        // Tolva de carga en la cola y faldones
+        const hopperMat = new THREE.MeshStandardMaterial({ color: 0x6d747b, roughness: 0.7, metalness: 0.4, side: THREE.DoubleSide });
+        const hopper = new THREE.Group();
+        const wall = (w: number, h: number, x: number, y: number, z: number, ry = 0) => {
+            const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), hopperMat);
+            m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; hopper.add(m);
+        };
+        wall(0.9, 0.6, 0, 0, 0.42); wall(0.9, 0.6, 0, 0, -0.42);
+        wall(0.84, 0.6, -0.45, 0, 0, Math.PI / 2); wall(0.84, 0.6, 0.45, 0, 0, Math.PI / 2);
+        hopper.position.set(-L / 2 + 1.2, BELT_Y + 0.75, 0);
+        scene.add(hopper);
+        for (const z of [-0.44, 0.44]) {
+            const skirt = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, 0.03), hopperMat);
+            skirt.position.set(-L / 2 + 1.9, BELT_Y + 0.13, z);
+            scene.add(skirt);
+        }
+
+        // Soporte y cuerpo de la cámara de visión, con su campo de visión
+        const camPost = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.1, 0.07), yellow);
+        camPost.position.set(X_CAM, 1.05, 0.95);
+        const camArm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.98), yellow);
+        camArm.position.set(X_CAM, 2.1, 0.47);
+        const camBody = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.16), new THREE.MeshStandardMaterial({ color: 0x1f2226, roughness: 0.5 }));
+        camBody.position.set(X_CAM, 2.02, 0);
+        scene.add(camPost, camArm, camBody);
+        const fovPts: number[] = [];
+        for (const [dx, dz] of [[-V_DEPTH, -V_HALF], [V_DEPTH, -V_HALF], [V_DEPTH, V_HALF], [-V_DEPTH, V_HALF]]) {
+            fovPts.push(X_CAM, 1.94, 0, X_CAM + dx, BELT_Y + 0.01, dz);
+        }
+        const fovRect = [[-V_DEPTH, -V_HALF], [V_DEPTH, -V_HALF], [V_DEPTH, V_HALF], [-V_DEPTH, V_HALF], [-V_DEPTH, -V_HALF]];
+        for (let i = 0; i < 4; i++) {
+            fovPts.push(X_CAM + fovRect[i][0], BELT_Y + 0.012, fovRect[i][1], X_CAM + fovRect[i + 1][0], BELT_Y + 0.012, fovRect[i + 1][1]);
+        }
+        const fovGeo = new THREE.BufferGeometry();
+        fovGeo.setAttribute("position", new THREE.Float32BufferAttribute(fovPts, 3));
+        scene.add(new THREE.LineSegments(fovGeo, new THREE.LineBasicMaterial({ color: 0x30e3ca, transparent: true, opacity: 0.55 })));
+
+        // Cámara de visión: ortográfica, mirando hacia abajo; la derecha de la imagen = +z
+        const visionCam = new THREE.OrthographicCamera(-V_HALF, V_HALF, V_DEPTH, -V_DEPTH, 0.1, 5);
+        visionCam.position.set(X_CAM, 1.94, 0);
+        visionCam.up.set(1, 0, 0);
+        visionCam.lookAt(X_CAM, 0, 0);
+        visionCam.updateProjectionMatrix();
+        visionCam.layers.set(VISION);
+        const rt = new THREE.WebGLRenderTarget(VW, VH);
+        const pixels = new Uint8Array(VW * VH * 4);
+        const vImage = vctx.createImageData(VW, VH);
+
+        // ------------------------------------------------------------------
+        // Mineral (instancias)
+        // ------------------------------------------------------------------
+        const MAX = 1400;
+        const ore = new THREE.InstancedMesh(
+            new THREE.DodecahedronGeometry(0.055, 0),
+            new THREE.MeshStandardMaterial({ color: 0x8c6c4e, roughness: 1, flatShading: true }),
+            MAX
+        );
+        ore.castShadow = true;
+        ore.layers.enable(VISION);
+        ore.frustumCulled = false;
+        scene.add(ore);
+        // Estado por roca: 0 libre, 1 sobre la correa, 2 cayendo, 3 en el suelo (derrame)
+        const st = new Uint8Array(MAX), px = new Float32Array(MAX), py = new Float32Array(MAX), pz = new Float32Array(MAX);
+        const pu = new Float32Array(MAX), vx = new Float32Array(MAX), vy = new Float32Array(MAX), vz = new Float32Array(MAX);
+        const sc = new Float32Array(MAX), rot = new Float32Array(MAX), spilled = new Uint8Array(MAX);
+        const tmp = new THREE.Object3D();
+        let spawnAcc = 0;
+        let lastSpill = -10;
+
+        // ------------------------------------------------------------------
+        // Estado de la simulación
+        // ------------------------------------------------------------------
+        const S = { y: 0, meas: 0, corr: 0, integ: 0, t: 0, width: 0, valid: true };
+        const val = (n: string) => Number((form.elements.namedItem(n) as HTMLInputElement).value);
+        const auto = () => (form.elements.namedItem("auto") as HTMLInputElement).checked;
+
+        const offsetAt = (x: number) => S.y * shape(x);
+
+        function updateBelt() {
+            const pos = beltGeo.attributes.position.array as Float32Array;
+            for (let i = 0; i < pos.length; i += 3) pos[i + 2] = basePos[i + 2] + offsetAt(basePos[i]);
+            beltGeo.attributes.position.needsUpdate = true;
+            beltGeo.computeVertexNormals();
+        }
+
+        function spawn(V: number, load: number) {
+            for (let i = 0; i < MAX; i++) {
+                if (st[i] !== 0) continue;
+                st[i] = 1;
+                px[i] = -L / 2 + 1.0 + Math.random() * 0.5;
+                const g = (Math.random() + Math.random() + Math.random() - 1.5) * 0.16;
+                pu[i] = Math.max(-0.36, Math.min(0.36, load * 0.5 + g));
+                sc[i] = 0.7 + Math.random() * 0.8;
+                rot[i] = Math.random() * Math.PI * 2;
+                spilled[i] = 0;
+                return;
+            }
+        }
+
+        function stepOre(dt: number, V: number) {
+            for (let i = 0; i < MAX; i++) {
+                const s = st[i];
+                if (s === 1) {
+                    px[i] += V * dt;
+                    const off = offsetAt(px[i]);
+                    pz[i] = off + pu[i];
+                    py[i] = BELT_Y + 0.045 * sc[i];
+                    // Derrame por el borde cuando la correa se corre demasiado
+                    const a = Math.abs(off);
+                    if (a > SPILL_START && Math.sign(pu[i]) === Math.sign(off) && Math.abs(pu[i]) > 0.2) {
+                        if (Math.random() < dt * 3 * (a - SPILL_START) / 0.06) {
+                            st[i] = 2; spilled[i] = 1; lastSpill = S.t;
+                            vx[i] = V * 0.6; vy[i] = 0.3; vz[i] = Math.sign(off) * (0.7 + Math.random() * 0.5);
+                        }
+                    }
+                    if (px[i] > L / 2) { st[i] = 2; vx[i] = V; vy[i] = 0.2; vz[i] = 0; }
+                } else if (s === 2) {
+                    vy[i] -= 9.81 * dt;
+                    px[i] += vx[i] * dt; py[i] += vy[i] * dt; pz[i] += vz[i] * dt;
+                    rot[i] += dt * 6;
+                    if (py[i] < 0.04) {
+                        if (spilled[i]) { st[i] = 3; py[i] = 0.04; } else { st[i] = 0; }
+                    }
+                }
+            }
+        }
+
+        function writeOre() {
+            let n = 0;
+            for (let i = 0; i < MAX; i++) {
+                if (st[i] === 0) continue;
+                tmp.position.set(px[i], py[i], pz[i]);
+                tmp.rotation.set(rot[i], rot[i] * 0.7, 0);
+                tmp.scale.setScalar(sc[i]);
+                tmp.updateMatrix();
+                ore.setMatrixAt(n++, tmp.matrix);
+            }
+            ore.count = n;
+            ore.instanceMatrix.needsUpdate = true;
+        }
+
+        // ------------------------------------------------------------------
+        // Visión: renderiza la vista superior y busca los bordes oscuros de la correa
+        // ------------------------------------------------------------------
+        const lum = (i: number) => (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]) / 255;
+
+        function edgesInRow(row: number) {
+            const base = row * VW * 4;
+            const L0 = (c: number) => lum(base + c * 4);
+            // Umbral adaptativo: entre el píxel más oscuro y el más claro de la fila (tipo Otsu simplificado)
+            let lo = 1, hi = 0;
+            for (let c = 0; c < VW; c++) { const v = L0(c); if (v < lo) lo = v; if (v > hi) hi = v; }
+            if (hi - lo < 0.05) return null;
+            const DARK = lo + 0.3 * (hi - lo);
+            // Borde izquierdo: primera transición claro→oscuro con al menos 8 px oscuros seguidos
+            let left = -1, right = -1;
+            for (let c = 1; c < VW - 8; c++) {
+                if (L0(c - 1) >= DARK && L0(c) < DARK) {
+                    let run = true;
+                    for (let k = 1; k < 8; k++) if (L0(c + k) >= DARK) { run = false; break; }
+                    if (run) { const a = L0(c - 1), b = L0(c); left = c - 1 + (a - DARK) / Math.max(a - b, 1e-6); break; }
+                }
+            }
+            for (let c = VW - 2; c > 8; c--) {
+                if (L0(c + 1) >= DARK && L0(c) < DARK) {
+                    let run = true;
+                    for (let k = 1; k < 8; k++) if (L0(c - k) >= DARK) { run = false; break; }
+                    if (run) { const a = L0(c + 1), b = L0(c); right = c + 1 - (a - DARK) / Math.max(a - b, 1e-6); break; }
+                }
+            }
+            return left >= 0 && right > left ? { left, right } : null;
+        }
+
+        const pxPerM = VW / (2 * V_HALF);
+        let lastEdges: { left: number; right: number }[] = [];
+
+        function runVision() {
+            renderer.setRenderTarget(rt);
+            renderer.render(scene, visionCam);
+            renderer.setRenderTarget(null);
+            renderer.readRenderTargetPixels(rt, 0, 0, VW, VH, pixels);
+
+            const rows = [0.25, 0.5, 0.75].map((f) => Math.round(VH * f));
+            const found = rows.map(edgesInRow).filter(Boolean) as { left: number; right: number }[];
+            lastEdges = found;
+            if (!found.length) { S.valid = false; return; }
+            const centers = found.map((e) => (e.left + e.right) / 2).sort((a, b) => a - b);
+            const widths = found.map((e) => (e.right - e.left) / pxPerM);
+            const center = centers[Math.floor(centers.length / 2)];
+            S.width = widths.reduce((a, b) => a + b, 0) / widths.length;
+            S.valid = Math.abs(S.width - BELT_W) < 0.12;
+            const raw = ((center - VW / 2) / pxPerM) * 1000;     // mm
+            S.meas = S.meas * 0.6 + raw * 0.4;
+        }
+
+        function drawVision() {
+            // Pasar de lineal a sRGB y voltear (WebGL entrega las filas de abajo hacia arriba)
+            const d = vImage.data;
+            for (let y = 0; y < VH; y++) {
+                const src = (VH - 1 - y) * VW * 4, dst = y * VW * 4;
+                for (let x = 0; x < VW * 4; x += 4) {
+                    d[dst + x] = 255 * Math.pow(pixels[src + x] / 255, 1 / 2.2);
+                    d[dst + x + 1] = 255 * Math.pow(pixels[src + x + 1] / 255, 1 / 2.2);
+                    d[dst + x + 2] = 255 * Math.pow(pixels[src + x + 2] / 255, 1 / 2.2);
+                    d[dst + x + 3] = 255;
+                }
+            }
+            vctx.putImageData(vImage, 0, 0);
+            // Línea central de referencia
+            vctx.strokeStyle = "rgba(255,255,255,0.5)";
+            vctx.setLineDash([6, 6]); vctx.lineWidth = 1;
+            vctx.beginPath(); vctx.moveTo(VW / 2, 0); vctx.lineTo(VW / 2, VH); vctx.stroke();
+            vctx.setLineDash([]);
+            // Bordes detectados en cada fila analizada
+            const rows = [0.25, 0.5, 0.75].map((f) => VH - Math.round(VH * f));
+            vctx.lineWidth = 2;
+            lastEdges.forEach((e, i) => {
+                const y = rows[i] ?? VH / 2;
+                vctx.strokeStyle = "#30e3ca";
+                for (const x of [e.left, e.right]) { vctx.beginPath(); vctx.moveTo(x, y - 9); vctx.lineTo(x, y + 9); vctx.stroke(); }
+            });
+            if (lastEdges.length) {
+                const cx = VW / 2 + (S.meas / 1000) * pxPerM;
+                vctx.strokeStyle = "#f5b942"; vctx.lineWidth = 2;
+                vctx.beginPath(); vctx.moveTo(cx, 0); vctx.lineTo(cx, VH); vctx.stroke();
+            }
+            vctx.fillStyle = "rgba(0,0,0,0.55)"; vctx.fillRect(0, 0, 150, 18);
+            vctx.fillStyle = "#fff"; vctx.font = "11px monospace";
+            vctx.fillText(S.valid ? `desvío ${nf(S.meas)} mm` : "detección no confiable", 6, 13);
+        }
+
+        // ------------------------------------------------------------------
+        // Interfaz
+        // ------------------------------------------------------------------
+        const badge = q("badge");
+        function updateOutputs() {
+            root!.querySelector('[data-out="v"]')!.textContent = nf(val("v"), 1);
+            root!.querySelector('[data-out="skew"]')!.textContent = nf(val("skew"), 1);
+            root!.querySelector('[data-out="load"]')!.textContent = nf(val("load"));
+        }
+        form.addEventListener("input", updateOutputs);
+        updateOutputs();
+
+        function readouts() {
+            q("meas").textContent = S.valid ? `${nf(S.meas)} mm` : "–";
+            q("real").textContent = `${nf(S.y * 1000)} mm`;
+            q("width").textContent = S.width ? `${nf(S.width * 1000)} mm` : "–";
+            q("corr").textContent = `${nf(S.corr, 1)}°`;
+            const a = Math.abs(S.meas);
+            let text = "Normal", cls = "";
+            if (S.t - lastSpill < 1.5) { text = "Alarma: derrame de material"; cls = "is-bad"; }
+            else if (!S.valid) { text = "Visión: detección no confiable"; cls = "is-warn"; }
+            else if (a >= 50) { text = `Alarma: desvío ${nf(S.meas)} mm`; cls = "is-bad"; }
+            else if (a >= 25) { text = `Advertencia: desvío ${nf(S.meas)} mm`; cls = "is-warn"; }
+            badge.textContent = text;
+            badge.className = `cv-badge ${cls}`;
+        }
+
+        function resetSim(clearControls: boolean) {
+            if (clearControls) {
+                (form.elements.namedItem("v") as HTMLInputElement).value = "3";
+                (form.elements.namedItem("skew") as HTMLInputElement).value = "0";
+                (form.elements.namedItem("load") as HTMLInputElement).value = "0";
+                (form.elements.namedItem("auto") as HTMLInputElement).checked = false;
+                updateOutputs();
+            }
+            Object.assign(S, { y: 0, meas: 0, corr: 0, integ: 0 });
+            lastVision = -1;
+            st.fill(0);
+            lastSpill = -10;
+        }
+        q("reset").addEventListener("click", () => resetSim(true));
+        q("fault").addEventListener("click", () => {
+            (form.elements.namedItem("skew") as HTMLInputElement).value = "2.2";
+            (form.elements.namedItem("load") as HTMLInputElement).value = "15";
+            updateOutputs();
+        });
+
+        // ------------------------------------------------------------------
+        // Bucle principal
+        // ------------------------------------------------------------------
+        function resize() {
+            const w = stage.clientWidth, h = stage.clientHeight;
+            renderer.setSize(w, h, false);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+        const ro = new ResizeObserver(resize);
+        ro.observe(stage);
+        resize();
+
+        let visible = true;
+        const io = new IntersectionObserver((e) => { visible = e[0].isIntersecting; });
+        io.observe(stage);
+
+        // La física avanza en tiempo real con pasos fijos y cortos, aunque el dibujo vaya
+        // a pocos cuadros por segundo (equipos lentos): así la correa no se ve "en cámara lenta".
+        const STEP = 1 / 60;
+        let raf = 0, last = performance.now(), lastVision = -1;
+
+        function physics(h: number, V: number, skew: number, load: number) {
+            S.t += h;
+            // Control PI del polín autoalineante, con la medición de la cámara
+            if (auto() && S.valid) {
+                const u = -(KP * S.meas + KI * S.integ);
+                if (Math.abs(u) < CORR_MAX) S.integ += S.meas * h;       // anti-windup
+                S.corr = Math.max(-CORR_MAX, Math.min(CORR_MAX, u));
+            } else if (!auto()) {
+                S.corr *= Math.max(0, 1 - h * 2);   // vuelve a cero suavemente
+                S.integ = 0;
+            }
+            // Deriva lateral de la correa
+            const theta = THREE.MathUtils.degToRad(skew + S.corr);
+            S.y += (V * (KS * theta + KL * load) - KC * S.y) * h;
+            S.y = Math.max(-Y_MAX, Math.min(Y_MAX, S.y));
+            // Mineral
+            spawnAcc += h * V * 16;
+            while (spawnAcc >= 1) { spawn(V, load); spawnAcc -= 1; }
+            stepOre(h, V);
+        }
+
+        function tick(now: number) {
+            raf = requestAnimationFrame(tick);
+            const dt = Math.min(0.25, (now - last) / 1000);
+            last = now;
+            if (!visible || document.hidden) return;
+            const V = val("v"), skew = val("skew"), load = val("load") / 100;
+
+            const n = Math.max(1, Math.ceil(dt / STEP));
+            for (let i = 0; i < n; i++) physics(dt / n, V, skew, load);
+
+            // Visual: giro de los polines (exagerado), avance de la correa y mineral
+            skewIdler.group.rotation.y = THREE.MathUtils.degToRad(skew * SKEW_VISUAL);
+            trainIdler.group.rotation.y = THREE.MathUtils.degToRad(S.corr * SKEW_VISUAL);
+            topTex.offset.x -= (V * dt) / 4;
+            retTex.offset.x += (V * dt) / 4;
+            updateBelt();
+            writeOre();
+
+            // La cámara de visión toma ~12 imágenes por segundo
+            if (S.t - lastVision >= 0.08) { lastVision = S.t; runVision(); drawVision(); readouts(); }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        q("loading").remove();
+        raf = requestAnimationFrame(tick);
+
+        cleanup = () => {
+            cancelAnimationFrame(raf);
+            ro.disconnect(); io.disconnect();
+            controls.dispose(); rt.dispose(); renderer.dispose();
+            scene.traverse((o: THREE.Object3D) => {
+                const m = o as THREE.Mesh;
+                if (m.geometry) m.geometry.dispose();
+            });
+        };
+    }
+
+    // Con las transiciones de página de Astro el script se carga una vez:
+    // se inicia en cada carga de página y se libera la GPU al salir.
+    document.addEventListener("astro:page-load", init);
+    document.addEventListener("astro:before-swap", () => { cleanup?.(); cleanup = null; });
+    init();
+</script>
