@@ -1,0 +1,55 @@
+---
+import { getEntry, getCollection, render } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import BaseItemCard from "../components/ui/BaseItemCard.astro";
+import { getListingItem } from "../utils/adapters";
+import { withBase } from "../utils/url";
+import { PAGES } from "../config";
+
+// Load bio content
+const bioEntry = await getEntry("bio", "bio");
+const { Content: BioContent } = bioEntry
+	? await render(bioEntry)
+	: { Content: null };
+
+// Proyectos destacados: los 3 primeros por nombre de archivo (proyecto-01, -02, -03)
+const featured = (await getCollection("projects"))
+	.sort((a, b) => a.id.localeCompare(b.id))
+	.slice(0, 3);
+---
+
+<BaseLayout title={PAGES.home.title}>
+	<div class="container-narrow">
+		{
+			(PAGES.home.title || PAGES.home.subtitle) && (
+				<header class="page-header">
+					{PAGES.home.title && (
+						<h1 class="page-title">{PAGES.home.title}</h1>
+					)}
+					{PAGES.home.subtitle && (
+						<p class="page-subtitle">{PAGES.home.subtitle}</p>
+					)}
+				</header>
+			)
+		}
+		<div class="prose">
+			{BioContent ? <BioContent /> : <p>Cargando…</p>}
+		</div>
+
+		{
+			PAGES.projects.isActive && featured.length > 0 && (
+				<section class="section mt-8">
+					<h2 class="section-title">Proyectos destacados</h2>
+					<div class="item-list">
+						{featured.map((entry) => (
+							<BaseItemCard {...getListingItem(entry)} href={withBase(`/projects/${entry.id}`)} />
+						))}
+					</div>
+					<p class="mt-8">
+						<a href={withBase("/projects")} class="link">Ver todo el portafolio →</a>
+					</p>
+				</section>
+			)
+		}
+	</div>
+</BaseLayout>

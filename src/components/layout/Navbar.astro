@@ -1,0 +1,39 @@
+---
+import { NAV_LINKS, PAGES } from "../../config";
+import { withBase, samePath } from "../../utils/url";
+import { withBase, samePath } from "../../utils/url";
+import { withBase, samePath } from "../../utils/url";
+
+const currentPath = Astro.url.pathname;
+---
+
+<nav class="navbar" data-ri-piece="header">
+    <ul class="nav-links">
+        {
+            NAV_LINKS.filter((link) => {
+                const isHome = link.href === "/";
+                const pageKey = isHome
+                    ? "home"
+                    : link.href.split("/").filter(Boolean)[0];
+                const pageConfig = (PAGES as any)[pageKey];
+                return link.isActive !== false && pageConfig?.active !== false;
+            }).map((link) => (
+                <li>
+                    <a
+                        href={withBase(link.href)}
+                        class={`nav-link ${
+                            samePath(currentPath, withBase(link.href)) ||
+                            (link.href !== "/" &&
+                                currentPath.startsWith(withBase(link.href)))
+                                ? "active"
+                                : "inactive"
+                        }`}
+                    >
+                        {link.label}
+                        <span class="nav-link-line" />
+                    </a>
+                </li>
+            ))
+        }
+    </ul>
+</nav>

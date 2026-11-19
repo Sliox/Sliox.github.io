@@ -1,0 +1,14 @@
+---
+import BaseListing from "../../layouts/BaseListing.astro";
+import { PAGES } from "../../config";
+
+if (PAGES.publications.isActive === false) {
+    return Astro.redirect(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/404`);
+}
+---
+
+<BaseListing
+    collection="publications"
+    title={PAGES.publications.title}
+    subtitle={PAGES.publications.subtitle}
+/>
