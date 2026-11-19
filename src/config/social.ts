@@ -10,15 +10,16 @@ export const SOCIALS: SocialLink[] = [
     },
     {
         name: "Mail",
-        href: "mailto:tu-correo@ejemplo.cl", // TODO: tu correo
+        href: "mailto:antoniobarrionuevosantander@gmail.com",
         linkTitle: "Enviar un correo a Nicolás",
-        isActive: false,
+        isActive: true,
     },
     {
         name: "LinkedIn",
-        href: "https://www.linkedin.com/in/tu-usuario/", // TODO: tu LinkedIn
+        // TODO: cuando crees tu perfil, reemplaza por https://www.linkedin.com/in/TU-USUARIO/
+        href: "https://www.linkedin.com/",
         linkTitle: "Nicolás Barrionuevo en LinkedIn",
-        isActive: false,
+        isActive: true,
     },
 ];
 

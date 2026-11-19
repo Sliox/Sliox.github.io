@@ -47,5 +47,5 @@ Abre la dirección que muestra la terminal (termina en `/portafolio/`).
 ## Pendiente
 
 - Busca `TODO` y `[` en `src/content/` y reemplaza los textos provisorios.
-- Activa correo y LinkedIn en `src/config/social.ts` con tus datos.
+- LinkedIn es provisorio: cuando crees tu perfil, cambia la dirección en `src/config/social.ts`.
 - Guarda tu CV como `public/cv.pdf` y descomenta el enlace en `src/content/cv.md`.
