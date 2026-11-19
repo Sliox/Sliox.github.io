@@ -38,5 +38,24 @@ export const THEMES: Record<string, Theme> = {
         muted: '#8a7d71',
         border: '#3d342d',
         accent: '#d97757',
+    },
+    // Paletas propias: las mismas de arriba, con el acento menta del tema "mint" de AcademicPages
+    light_mint: {
+        background: "#f9fafb",
+        foreground: "#111827",
+        accent: "#11999e",
+        muted: "#6b7280",
+        border: "#e5e7eb",
+        surface: "#f9fafb",
+        isDark: false,
+    },
+    dark_notepad_mint: {
+        isDark: true,
+        background: '#241f1c',
+        surface: '#241f1c',
+        foreground: '#e6dfd3',
+        muted: '#8a7d71',
+        border: '#3d342d',
+        accent: '#30e3ca',
     }
 };
