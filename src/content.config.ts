@@ -71,6 +71,8 @@ const projects = defineCollection({
         tags: z.array(z.string()).optional(),
         external_url: z.string().optional(),
         image: z.string().optional(),
+        // Nombre de una demo interactiva (src/components/demos) que se muestra en la ficha
+        demo: z.string().optional(),
     }),
 });
 

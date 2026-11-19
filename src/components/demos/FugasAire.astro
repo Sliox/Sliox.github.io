@@ -1,0 +1,331 @@
+---
+// Demo interactiva del proyecto "Detector de fugas de aire comprimido".
+// 1) Escáner ultrasónico simulado sobre una red de aire con 3 fugas escondidas.
+// 2) Calculadora del caudal perdido y su costo anual.
+// Todo corre en el navegador; no usa librerías.
+---
+
+<section class="fa-demo" aria-labelledby="fa-titulo">
+    <h2 id="fa-titulo" class="section-title">Demo interactiva</h2>
+    <p class="fa-help">
+        Mueve el sensor sobre la red de aire comprimido (con el mouse, el dedo o las flechas del teclado).
+        Cuando la lectura suba, haz clic o presiona <kbd>Enter</kbd> para marcar la fuga. Hay <strong>3</strong> escondidas.
+    </p>
+
+    <div class="fa-grid">
+        <svg
+            class="fa-plant"
+            viewBox="0 0 640 260"
+            tabindex="0"
+            role="application"
+            aria-label="Red de aire comprimido. Usa las flechas para mover el sensor y Enter para marcar una fuga."
+        >
+            <!-- Compresor -->
+            <rect class="fa-equip" x="18" y="88" width="78" height="64" rx="6" />
+            <text class="fa-label" x="57" y="125" text-anchor="middle">Compresor</text>
+            <!-- Cañería principal -->
+            <line class="fa-pipe" x1="96" y1="120" x2="612" y2="120" />
+            <!-- Bajadas -->
+            <line class="fa-pipe fa-pipe-thin" x1="220" y1="120" x2="220" y2="200" />
+            <line class="fa-pipe fa-pipe-thin" x1="400" y1="120" x2="400" y2="200" />
+            <line class="fa-pipe fa-pipe-thin" x1="560" y1="120" x2="560" y2="180" />
+            <!-- Uniones -->
+            <rect class="fa-fitting" x="152" y="111" width="14" height="18" rx="2" />
+            <rect class="fa-fitting" x="293" y="111" width="14" height="18" rx="2" />
+            <rect class="fa-fitting" x="466" y="111" width="14" height="18" rx="2" />
+            <!-- Equipos -->
+            <rect class="fa-equip" x="180" y="200" width="80" height="34" rx="5" />
+            <text class="fa-label" x="220" y="222" text-anchor="middle">Cilindro</text>
+            <rect class="fa-equip" x="355" y="200" width="90" height="34" rx="5" />
+            <text class="fa-label" x="400" y="222" text-anchor="middle">Sopladora</text>
+            <rect class="fa-equip" x="522" y="180" width="76" height="54" rx="5" />
+            <text class="fa-label" x="560" y="204" text-anchor="middle">FRL +</text>
+            <text class="fa-label" x="560" y="220" text-anchor="middle">válvula</text>
+            <text class="fa-label fa-muted" x="612" y="106" text-anchor="end">7 bar</text>
+
+            <g class="fa-marks"></g>
+
+            <!-- Sensor -->
+            <g class="fa-probe" transform="translate(320 70)">
+                <circle r="16" class="fa-probe-ring" />
+                <circle r="3" class="fa-probe-dot" />
+                <line x1="-24" y1="0" x2="-18" y2="0" class="fa-probe-tick" />
+                <line x1="18" y1="0" x2="24" y2="0" class="fa-probe-tick" />
+                <line x1="0" y1="-24" x2="0" y2="-18" class="fa-probe-tick" />
+                <line x1="0" y1="18" x2="0" y2="24" class="fa-probe-tick" />
+            </g>
+        </svg>
+
+        <div class="fa-meter">
+            <p class="fa-meter-title">Nivel ultrasónico (40 kHz)</p>
+            <p class="fa-db"><span data-fa="db">0</span> <small>dB</small></p>
+            <div class="fa-bar" aria-hidden="true"><div class="fa-bar-fill" data-fa="bar"></div></div>
+            <p class="fa-status" data-fa="status" aria-live="polite">Acerca el sensor a la red.</p>
+            <p class="fa-found-title">Fugas encontradas: <span data-fa="count">0</span> / 3</p>
+            <ul class="fa-found" data-fa="found"></ul>
+            <p class="fa-total" data-fa="total" hidden></p>
+            <button type="button" class="btn btn-sm" data-fa="reset">Reiniciar</button>
+        </div>
+    </div>
+
+    <h3 class="fa-subtitle">¿Cuánto cuesta una fuga?</h3>
+    <form class="fa-calc" data-fa="calc" onsubmit="return false">
+        <label><span>Presión de la red: <output data-out="p">7</output> bar</span>
+            <input type="range" name="p" min="3" max="10" step="0.5" value="7" />
+        </label>
+        <label><span>Diámetro del orificio: <output data-out="d">3</output> mm</span>
+            <input type="range" name="d" min="0.5" max="6" step="0.5" value="3" />
+        </label>
+        <label>Horas de operación al año
+            <input type="number" name="h" min="0" max="8760" step="10" value="8760" />
+        </label>
+        <label>Precio de la energía (CLP/kWh)
+            <input type="number" name="price" min="0" step="1" value="120" />
+        </label>
+        <label>Consumo del compresor (kW por L/s)
+            <input type="number" name="spec" min="0.05" max="0.3" step="0.01" value="0.11" />
+        </label>
+    </form>
+    <dl class="fa-results">
+        <div><dt>Aire perdido</dt><dd data-fa="q">–</dd></div>
+        <div><dt>Potencia desperdiciada</dt><dd data-fa="kw">–</dd></div>
+        <div><dt>Energía al año</dt><dd data-fa="kwh">–</dd></div>
+        <div><dt>Costo al año</dt><dd data-fa="cost">–</dd></div>
+    </dl>
+    <p class="fa-note">
+        Valores aproximados para comparar órdenes de magnitud, no una medición. Los supuestos están explicados más abajo.
+    </p>
+</section>
+
+<style is:global>
+    .fa-demo { margin: 1.5rem 0 2.5rem; }
+    .fa-help { margin-bottom: 1rem; }
+    .fa-help kbd { font-family: "JetBrains Mono", monospace; font-size: 0.8em; border: 1px solid var(--border); border-radius: 0.2rem; padding: 0 0.3rem; }
+    .fa-grid { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1rem; align-items: start; }
+    @media (max-width: 768px) { .fa-grid { grid-template-columns: 1fr; } }
+
+    .fa-plant {
+        width: 100%; height: auto; display: block;
+        border: 1px solid var(--border); border-radius: 0.5rem;
+        background: color-mix(in srgb, var(--foreground) 3%, var(--background));
+        cursor: crosshair; touch-action: none;
+    }
+    .fa-plant:focus-visible { outline: 2px dashed var(--accent); outline-offset: 2px; }
+    .fa-pipe { stroke: var(--text-muted); stroke-width: 10; stroke-linecap: round; }
+    .fa-pipe-thin { stroke-width: 6; }
+    .fa-fitting { fill: var(--foreground); opacity: 0.55; }
+    .fa-equip { fill: var(--background); stroke: var(--text-muted); stroke-width: 2; }
+    .fa-label { fill: var(--foreground); font-size: 12px; font-weight: 600; font-family: inherit; }
+    .fa-muted { opacity: 0.6; font-weight: 500; }
+    .fa-probe { pointer-events: none; }
+    .fa-probe-ring { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-width: 2; }
+    .fa-probe-dot { fill: var(--accent); }
+    .fa-probe-tick { stroke: var(--accent); stroke-width: 2; }
+    .fa-leak-mark { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+    .fa-leak-burst { fill: var(--accent); opacity: 0.25; }
+    .fa-leak-text { fill: var(--accent); font-size: 12px; font-weight: 800; }
+
+    .fa-meter { border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; }
+    .fa-meter-title { font-size: 0.8rem; font-weight: 600; opacity: 0.75; margin: 0; }
+    .fa-db { font-family: "JetBrains Mono", monospace; font-size: 2.4rem; font-weight: 700; line-height: 1.1; margin: 0.25rem 0 0.5rem; opacity: 1; }
+    .fa-db small { font-size: 1rem; opacity: 0.7; }
+    .fa-bar { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+    .fa-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.08s linear; }
+    .fa-status { font-size: 0.85rem; min-height: 2.6em; margin: 0.6rem 0; }
+    .fa-found-title { font-size: 0.85rem; font-weight: 700; margin: 0 0 0.25rem; }
+    .fa-found { font-size: 0.8rem; padding-left: 1.1rem; margin: 0 0 0.5rem; }
+    .fa-found li { margin-bottom: 0.25rem; }
+    .fa-total { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin: 0 0 0.75rem; opacity: 1; }
+
+    .fa-subtitle { margin: 2rem 0 0.75rem; }
+    .fa-calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.9rem 1.5rem; }
+    .fa-calc label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; font-weight: 600; }
+    .fa-calc output { color: var(--accent); }
+    .fa-calc input[type="range"] { accent-color: var(--accent); }
+    .fa-calc input[type="number"] {
+        font: inherit; font-weight: 500; padding: 0.35rem 0.5rem;
+        border: 1px solid var(--border); border-radius: 0.25rem;
+        background: var(--background); color: var(--foreground);
+    }
+    .fa-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1.25rem 0 0.5rem; }
+    .fa-results div { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem; }
+    .fa-results dt { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
+    .fa-results dd { margin: 0.25rem 0 0; font-family: "JetBrains Mono", monospace; font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .fa-note { font-size: 0.8rem; opacity: 0.7; }
+</style>
+
+<script>
+    // ---------------- Física de la fuga ----------------
+    // Flujo crítico (estrangulado) de aire por un orificio:
+    //   m = Cd · A · p0 · sqrt(γ / (R·T)) · (2/(γ+1))^((γ+1)/(2(γ−1)))
+    // Con aire (γ = 1,4; R = 287 J/kg·K) a 20 °C, la parte constante vale 0,002361 s/m.
+    // Válido cuando la presión de la red supera ~0,9 bar manométricos (siempre en esta demo).
+    const CD = 0.65;            // coeficiente de descarga de un orificio irregular
+    const K_CHOKED = 0.002361;  // s/m, aire a 20 °C
+    const RHO_ATM = 1.204;      // kg/m³, aire libre a 20 °C y 1 atm
+    const P_ATM = 1.01325;      // bar
+
+    /** Caudal de aire libre perdido, en L/s. */
+    function leakFlowLs(pBarG: number, dMm: number): number {
+        const p0 = (pBarG + P_ATM) * 1e5;             // Pa absolutos
+        const area = Math.PI * (dMm / 1000) ** 2 / 4; // m²
+        const massFlow = CD * area * p0 * K_CHOKED;   // kg/s
+        return (massFlow / RHO_ATM) * 1000;           // L/s de aire libre
+    }
+
+    const nf = (v: number, d = 0) => v.toLocaleString("es-CL", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+    // ---------------- Fugas escondidas (coordenadas del SVG) ----------------
+    type Leak = { x: number; y: number; d: number; where: string; found: boolean };
+    const LEAKS: Omit<Leak, "found">[] = [
+        { x: 300, y: 120, d: 3, where: "Unión de la cañería principal" },
+        { x: 400, y: 182, d: 1.5, where: "Manguera de la sopladora" },
+        { x: 560, y: 172, d: 2, where: "Conexión del FRL" },
+    ];
+
+    function init() {
+        const root = document.querySelector<HTMLElement>(".fa-demo");
+        if (!root || root.dataset.ready) return;
+        root.dataset.ready = "1";
+
+        const svg = root.querySelector<SVGSVGElement>(".fa-plant")!;
+        const probe = root.querySelector<SVGGElement>(".fa-probe")!;
+        const marks = root.querySelector<SVGGElement>(".fa-marks")!;
+        const $ = (k: string) => root.querySelector<HTMLElement>(`[data-fa="${k}"]`)!;
+        const form = $("calc") as HTMLFormElement;
+
+        let leaks: Leak[] = LEAKS.map((l) => ({ ...l, found: false }));
+        const pos = { x: 320, y: 70 };
+
+        // ---------- Calculadora ----------
+        const val = (name: string) => Number((form.elements.namedItem(name) as HTMLInputElement).value) || 0;
+        function costFor(dMm: number) {
+            const q = leakFlowLs(val("p"), dMm);
+            const kw = q * val("spec");
+            const kwh = kw * val("h");
+            return { q, kw, kwh, cost: kwh * val("price") };
+        }
+        function updateCalc() {
+            root!.querySelector('[data-out="p"]')!.textContent = nf(val("p"), 1);
+            root!.querySelector('[data-out="d"]')!.textContent = nf(val("d"), 1);
+            const r = costFor(val("d"));
+            $("q").textContent = `${nf(r.q, 1)} L/s`;
+            $("kw").textContent = `${nf(r.kw, 2)} kW`;
+            $("kwh").textContent = `${nf(r.kwh)} kWh`;
+            $("cost").textContent = `$${nf(r.cost)} CLP`;
+            renderFound();
+        }
+        form.addEventListener("input", updateCalc);
+
+        // ---------- Sensor ----------
+        // Nivel de cada fuga: crece con el tamaño (≈ +6 dB al duplicar el diámetro)
+        // y cae con la distancia (−6 dB al duplicarla). Valores ilustrativos, no calibrados.
+        function reading(x: number, y: number): number {
+            let energy = Math.pow(10, 22 / 10); // ruido de fondo de la planta ≈ 22 dB
+            for (const l of leaks) {
+                const r = Math.max(Math.hypot(x - l.x, y - l.y), 8);
+                const level = 62 + 20 * Math.log10(l.d) - 20 * Math.log10(r / 8);
+                energy += Math.pow(10, level / 10);
+            }
+            return 10 * Math.log10(energy) + (Math.random() - 0.5) * 1.5;
+        }
+
+        function nearestHidden(x: number, y: number) {
+            let best: Leak | null = null, bestD = Infinity;
+            for (const l of leaks) {
+                if (l.found) continue;
+                const d = Math.hypot(x - l.x, y - l.y);
+                if (d < bestD) { bestD = d; best = l; }
+            }
+            return { leak: best, dist: bestD };
+        }
+
+        function moveTo(x: number, y: number) {
+            pos.x = Math.min(632, Math.max(8, x));
+            pos.y = Math.min(252, Math.max(8, y));
+            probe.setAttribute("transform", `translate(${pos.x} ${pos.y})`);
+            const db = reading(pos.x, pos.y);
+            $("db").textContent = nf(db);
+            ($("bar") as HTMLElement).style.width = `${Math.min(100, Math.max(0, db))}%`;
+        }
+
+        function svgPoint(evt: PointerEvent) {
+            const pt = svg.createSVGPoint();
+            pt.x = evt.clientX; pt.y = evt.clientY;
+            const p = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+            return { x: p.x, y: p.y };
+        }
+
+        function mark() {
+            const { leak, dist } = nearestHidden(pos.x, pos.y);
+            const status = $("status");
+            if (leak && dist <= 26) {
+                leak.found = true;
+                drawMark(leak);
+                renderFound();
+                const left = leaks.filter((l) => !l.found).length;
+                status.textContent = left
+                    ? `¡Fuga encontrada en ${leak.where.toLowerCase()}! Quedan ${left}.`
+                    : "¡Encontraste las 3 fugas! Mira cuánto cuestan al año.";
+            } else if (leak && dist <= 70) {
+                status.textContent = "Estás cerca: sigue moviéndote hacia donde sube la lectura.";
+            } else {
+                status.textContent = "Aquí no hay fuga. Busca donde la lectura sea más alta.";
+            }
+        }
+
+        function drawMark(l: Leak) {
+            const ns = "http://www.w3.org/2000/svg";
+            const g = document.createElementNS(ns, "g");
+            g.innerHTML =
+                `<circle class="fa-leak-burst" cx="${l.x}" cy="${l.y}" r="18"></circle>` +
+                `<circle class="fa-leak-mark" cx="${l.x}" cy="${l.y}" r="12"></circle>` +
+                `<text class="fa-leak-text" x="${l.x + 16}" y="${l.y - 14}">${leaks.indexOf(l) + 1}</text>`;
+            marks.appendChild(g);
+        }
+
+        function renderFound() {
+            const found = leaks.filter((l) => l.found);
+            $("count").textContent = String(found.length);
+            const list = $("found");
+            list.innerHTML = "";
+            let total = 0;
+            for (const l of found) {
+                const r = costFor(l.d);
+                total += r.cost;
+                const li = document.createElement("li");
+                li.textContent = `#${leaks.indexOf(l) + 1} ${l.where}: ~${nf(l.d, 1)} mm, ${nf(r.q, 1)} L/s, $${nf(r.cost)}/año`;
+                list.appendChild(li);
+            }
+            const totalEl = $("total");
+            totalEl.hidden = found.length === 0;
+            totalEl.textContent = `Total: $${nf(total)} CLP al año`;
+        }
+
+        svg.addEventListener("pointermove", (e) => { const p = svgPoint(e); moveTo(p.x, p.y); });
+        svg.addEventListener("pointerdown", (e) => { const p = svgPoint(e); moveTo(p.x, p.y); mark(); });
+        svg.addEventListener("keydown", (e) => {
+            const step = e.shiftKey ? 30 : 10;
+            const moves: Record<string, [number, number]> = {
+                ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+            };
+            if (moves[e.key]) { e.preventDefault(); moveTo(pos.x + moves[e.key][0], pos.y + moves[e.key][1]); }
+            else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); mark(); }
+        });
+
+        $("reset").addEventListener("click", () => {
+            leaks = LEAKS.map((l) => ({ ...l, found: false }));
+            marks.innerHTML = "";
+            $("status").textContent = "Acerca el sensor a la red.";
+            renderFound();
+            moveTo(320, 70);
+        });
+
+        updateCalc();
+        moveTo(pos.x, pos.y);
+    }
+
+    // Con las transiciones de página de Astro, el script corre una vez: se reinicia en cada carga.
+    document.addEventListener("astro:page-load", init);
+    init();
+</script>
