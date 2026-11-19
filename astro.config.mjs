@@ -19,6 +19,6 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   site: 'https://sliox.github.io',
-  base: '/portafolio',
+  base: '/',
   integrations: [sitemap()],
 });

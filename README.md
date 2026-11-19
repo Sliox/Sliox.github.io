@@ -2,7 +2,7 @@
 
 Sitio hecho con [Astro](https://astro.build) a partir de la plantilla
 [Academic Portfolio Astro](https://github.com/rubzip/academic-portfolio-astro) (licencia MIT, ver `LICENSE`).
-Se publica solo en **https://sliox.github.io/portafolio/** cada vez que haces `push` a `main`
+Se publica solo en **https://sliox.github.io/** cada vez que haces `push` a `main`
 (GitHub Actions, archivo `.github/workflows/deploy.yml`).
 
 ## Editar el contenido (no hace falta tocar código)
@@ -29,11 +29,11 @@ npm install
 npm run dev
 ```
 
-Abre la dirección que muestra la terminal (termina en `/portafolio/`).
+Abre la dirección que muestra la terminal.
 
 ## Cambios respecto de la plantilla
 
-- Enlaces con la subcarpeta `/portafolio/` (`src/utils/url.ts → withBase`), para que funcionen en GitHub Pages.
+- Enlaces internos con `withBase` (`src/utils/url.ts`), por si algún día el sitio vuelve a una subcarpeta (`base` en `astro.config.mjs`).
 - Textos en español y tema oscuro por defecto.
 - Secciones de publicaciones, charlas, docencia y blog desactivadas en `src/config/pages.ts`.
 - Intro animada de brazos robóticos: `public/js/robot-intro.js` y estilos al final de `src/styles/global.css`.

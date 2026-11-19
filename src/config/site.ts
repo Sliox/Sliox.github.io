@@ -1,7 +1,7 @@
 import type { SiteConfig, ThemeConfig, SettingsConfig, UmamiAnalyticsConfig, AnalyticsConfig } from "../types";
 
 export const SITE: SiteConfig = {
-    website: "https://sliox.github.io/portafolio/",
+    website: "https://sliox.github.io/",
     author: "Nicolás Barrionuevo",
     desc: "Portafolio de Nicolás Barrionuevo, estudiante de Técnico en Mecatrónica en INACAP Copiapó, orientado a la minería.",
     title: "Nicolás Barrionuevo",
