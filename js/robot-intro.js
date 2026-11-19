@@ -121,7 +121,7 @@
     var T = mobile
       ? { enter: 700, app: 520, grip: 170, carry: 900, rel: 170, ret: 380, exit: 520, stagger: 650 }
       : { enter: 700, app: 520, grip: 160, carry: 900, rel: 160, ret: 380, exit: 500, stagger: 480 };
-    T.pull = T.carry;                 // el tirón de la cortina dura lo mismo que cualquier traslado
+    T.pull = T.carry * 0.8;           // el primer brazo (la cortina) va un poco más rápido
     var R = makeRobots(vw, vh, mobile);
     var lastStart = -Infinity;
     function nextStart(rb) {
@@ -131,7 +131,7 @@
     function assign(rb, p) {
       var start = nextStart(rb);
       // La cortina necesita que el brazo llegue y cierre la pinza antes de tirar.
-      if (p.curtain && !rb.jobs.length) { start = Math.max(start, T.enter + T.grip); }
+      if (p.curtain && !rb.jobs.length) { start = Math.max(start, T.enter * 0.75 + T.grip); }
       lastStart = start;
       p.robot = rb; p.carry0 = start; p.carry1 = start + (p.curtain ? T.pull : T.carry);
       if (p.curtain) {
@@ -212,8 +212,8 @@
         if (i === 0) {
           // Cada brazo entra justo antes de su primer traslado (no todos al comienzo).
           // La duración de la entrada crece con la distancia, para no "teletransportar" piezas largas.
-          // La cortina abre la animación: su brazo entra en el mismo tiempo que los demás.
-          var enterDur = p.curtain ? T.enter : clamp(rb.off / 1.2, T.enter, 1600);
+          // La cortina abre la animación: su brazo entra un poco más rápido que los demás.
+          var enterDur = p.curtain ? T.enter * 0.75 : clamp(rb.off / 1.2, T.enter, 1600);
           if (p.curtain) {
             // Llega con la pinza abierta, la cierra sobre el borde y recién ahí tira.
             segs.push({ type: 'enter', t0: p.carry0 - T.grip - enterDur, t1: p.carry0 - T.grip, p: p });
