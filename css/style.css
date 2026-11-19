@@ -135,6 +135,8 @@ html[data-theme="dark"] .icon-sun, html:not([data-theme="dark"]) .icon-moon { di
 .author__avatar { flex: none; width: 36px; }
 .author__avatar img { display: block; width: 100%; max-width: 175px; border-radius: 50%; }
 .author__content { flex: 1; padding: 0 25px 0 15px; line-height: 1; }
+/* Sin avatar (como en Minimal Mistakes cuando no se define uno): el perfil empieza con el nombre */
+.author__content:first-child { padding-left: 0; }
 .author__name { margin: 0; font-size: 1em; }
 .author__headline { margin: .1em 0 .5em; font-size: .8em !important; font-weight: 600; color: var(--accent); }
 .author__bio { margin: 0; }

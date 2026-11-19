@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Avatar">
-<defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#f28c28"/></linearGradient></defs>
-<rect width="256" height="256" fill="url(#a)"/>
-<polygon points="220.0,128.0 219.4,138.3 198.0,144.0 195.7,151.7 210.9,167.9 205.9,176.9 184.1,172.7 178.7,178.7 185.4,199.9 176.9,205.9 159.1,192.7 151.7,195.7 148.5,217.7 138.3,219.4 128.0,199.8 120.0,199.3 107.5,217.7 97.6,214.8 96.9,192.7 89.8,188.8 70.6,199.9 62.9,193.1 71.9,172.7 67.2,166.2 45.1,167.9 41.2,158.4 58.0,144.0 56.7,136.0 36.0,128.0 36.6,117.7 58.0,112.0 60.3,104.3 45.1,88.1 50.1,79.1 71.9,83.3 77.3,77.3 70.6,56.1 79.1,50.1 96.9,63.3 104.3,60.3 107.5,38.3 117.7,36.6 128.0,56.2 136.0,56.7 148.5,38.3 158.4,41.2 159.1,63.3 166.2,67.2 185.4,56.1 193.1,62.9 184.1,83.3 188.8,89.8 210.9,88.1 214.8,97.6 198.0,112.0 199.3,120.0" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="5"/>
-<circle cx="128" cy="128" r="66" fill="#0f172a" fill-opacity=".55" stroke="#fff" stroke-opacity=".5" stroke-width="3"/>
-<text x="128" y="147" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="56" font-weight="700" fill="#fff">NB</text>
-</svg>

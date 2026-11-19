@@ -19,5 +19,7 @@ La cabecera y la barra lateral se repiten en cada página: si cambias tu bio o t
 ## Pendiente
 - Busca `TODO` y `[` en los `.html` y reemplaza los textos provisorios.
 - Correo y LinkedIn están comentados en la barra lateral: descoméntalos con tus datos.
-- Cambia `img/avatar.svg` por tu foto y `img/proyecto-0N.svg` por fotos reales.
+- Cambia `img/proyecto-0N.svg` por fotos reales.
+- El perfil no tiene foto (como Minimal Mistakes sin avatar). Para poner una, agrega antes de `author__content` en cada página:
+  `<div class="author__avatar"><img src="img/tu-foto.jpg" alt="Nicolás Barrionuevo" width="175" height="175"></div>`
 - Guarda tu CV como `files/cv.pdf`.
